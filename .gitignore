@@ -27,7 +27,16 @@ render.experimental.xml
 *.keystore
 
 # Google Services (e.g. APIs or Firebase)
-google-services.json
+
 
 # Android Profiling
 *.hprof
+
+# OS files
+.DS_Store
+
+# Python virtual environment
+venv/
+
+# Installers
+backend/cmake-installer.msi
