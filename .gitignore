@@ -27,7 +27,8 @@ render.experimental.xml
 *.keystore
 
 # Google Services (e.g. APIs or Firebase)
-
+backend/config/firebase_config.json
+!backend/config/firebase_config.example.json
 
 # Android Profiling
 *.hprof
@@ -40,3 +41,25 @@ venv/
 
 # Installers
 backend/cmake-installer.msi
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
