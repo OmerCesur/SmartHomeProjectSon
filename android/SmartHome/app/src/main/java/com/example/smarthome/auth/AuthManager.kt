@@ -214,4 +214,13 @@ object AuthManager {
                 onFailure(e.message ?: "Failed to get user data")
             }
     }
+
+    fun logout(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        try {
+            auth.signOut()
+            onSuccess()
+        } catch (e: Exception) {
+            onFailure(e.message ?: "Failed to logout")
+        }
+    }
 }
