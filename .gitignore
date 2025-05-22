@@ -63,3 +63,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Environment files
+.env
+backend/.env
+backend/firebase_config_env.json
