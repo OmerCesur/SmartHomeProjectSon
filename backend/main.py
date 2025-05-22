@@ -48,15 +48,31 @@ try:
     logger.info(f"Firebase config path: {firebase_config_path}")
     
     if not os.path.exists(firebase_config_path):
+        logger.error(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
         raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
     
+    with open(firebase_config_path, 'r') as f:
+        config_content = f.read()
+        logger.debug(f"Firebase config içeriği: {config_content}")
+    
     firebase_cred = credentials.Certificate(firebase_config_path)
+    logger.info("Firebase credentials başarıyla yüklendi")
+    
     firebase_app = initialize_app(firebase_cred, {
         'databaseURL': 'https://smarthome-aa9f5-default-rtdb.europe-west1.firebasedatabase.app/'
     })
     logger.info("Firebase başarıyla başlatıldı")
+    
+    # Test bağlantısı
+    try:
+        ref = db.reference('/')
+        test_data = ref.get()
+        logger.info("Firebase bağlantı testi başarılı")
+    except Exception as e:
+        logger.error(f"Firebase bağlantı testi başarısız: {str(e)}")
+        raise
 except Exception as e:
-    logger.error(f"Firebase başlatılırken hata oluştu: {str(e)}")
+    logger.error(f"Firebase başlatılırken hata oluştu: {str(e)}", exc_info=True)
     raise
 
 @app.route('/sensors/bulk-update', methods=['POST'])

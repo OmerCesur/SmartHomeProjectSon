@@ -247,8 +247,15 @@ def get_sensor_data(room, sensor_type):
         ref = db.reference(f"sensors/{room}/{sensor_type}")
         logger.debug(f"Firebase referansı: sensors/{room}/{sensor_type}")
         
-        sensor_data = ref.get()
-        logger.debug(f"Firebase'den alınan veri: {sensor_data}")
+        try:
+            sensor_data = ref.get()
+            logger.debug(f"Firebase'den alınan veri: {sensor_data}")
+        except Exception as e:
+            logger.error(f"Firebase'den veri alınırken hata oluştu: {str(e)}", exc_info=True)
+            return jsonify({
+                "error": "Firebase'den veri alınamadı.",
+                "details": str(e)
+            }), 500
 
         if not sensor_data:
             logger.info(f"Sensör verisi bulunamadı: {room}/{sensor_type}")
