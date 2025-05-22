@@ -15,10 +15,12 @@ import com.example.smarthome.adapters.MembersAdapter
 import com.example.smarthome.viewmodels.MembersViewModel
 import com.example.smarthome.auth.AuthManager
 import com.example.smarthome.model.User
+import com.example.smarthome.activities.LoginActivity
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import android.widget.Toast
 
 // TODO: Rename parameter arguments, choose names that match
 // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -63,6 +65,23 @@ class MembersFragment : Fragment() {
         // Initialize RecyclerViews
         val rvHost = view.findViewById<RecyclerView>(R.id.rvHost)
         val rvGuests = view.findViewById<RecyclerView>(R.id.rvGuests)
+
+        // Setup logout button
+        view.findViewById<Button>(R.id.btnLogout).setOnClickListener {
+            AuthManager.logout(
+                onSuccess = {
+                    Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
+                    // Navigate to login screen
+                    val intent = Intent(activity, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    activity?.finish()
+                },
+                onFailure = { errorMsg ->
+                    Toast.makeText(context, "Logout failed: $errorMsg", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
 
         // Check if current user is host
         var isCurrentUserHost = false
