@@ -44,12 +44,16 @@ app.register_blueprint(command_bp, url_prefix='/api')
 
 # Firebase yapılandırması
 try:
-    firebase_config_path = os.path.join(os.path.dirname(__file__), "config/firebase_config.json")
-    logger.info(f"Firebase config path: {firebase_config_path}")
-    
+    firebase_config_path = os.path.join(os.path.dirname(__file__), 'config', 'firebase_config.json')
+    firebase_env = os.environ.get("FIREBASE_CONFIG")
+
     if not os.path.exists(firebase_config_path):
-        logger.error(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
-        raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
+        if firebase_env:
+            # Environment variable'dan dosyaya yaz
+            with open(firebase_config_path, "w") as f:
+                f.write(firebase_env.replace("\\n", "\n"))
+        else:
+            raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
     
     with open(firebase_config_path, 'r') as f:
         config_content = f.read()
