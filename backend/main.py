@@ -51,6 +51,7 @@ try:
         if firebase_env:
             try:
                 import json
+                import base64
                 # Environment variable'dan JSON'ı parse et
                 config_data = json.loads(firebase_env)
                 
@@ -79,6 +80,22 @@ try:
                     
                     # Satırları birleştir
                     private_key = '\n'.join(private_key_lines)
+                    
+                    # Base64 kodlamasını düzelt
+                    try:
+                        # Private key'in içeriğini al (BEGIN ve END satırları hariç)
+                        key_content = '\n'.join(line for line in private_key_lines[1:-1])
+                        # Base64 decode et
+                        decoded_key = base64.b64decode(key_content)
+                        # Tekrar encode et
+                        encoded_key = base64.b64encode(decoded_key).decode('utf-8')
+                        # Satırları 64 karakterlik parçalara böl
+                        wrapped_key = '\n'.join(encoded_key[i:i+64] for i in range(0, len(encoded_key), 64))
+                        # BEGIN ve END satırlarını ekle
+                        private_key = f"{begin_line}\n{wrapped_key}\n{end_line}"
+                    except Exception as e:
+                        logger.warning(f"Base64 düzeltme başarısız oldu, orijinal private key kullanılıyor: {str(e)}")
+                    
                     config_data['private_key'] = private_key
 
                 # Düzgün formatlanmış JSON olarak kaydet
