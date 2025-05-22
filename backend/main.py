@@ -56,13 +56,17 @@ try:
                 
                 # Private key'i düzgün formatta hazırla
                 if 'private_key' in config_data:
-                    # Tüm \n karakterlerini gerçek satır sonlarına çevir
-                    private_key = config_data['private_key']
+                    # Private key'i satır satır işle
+                    private_key_lines = config_data['private_key'].split('\\n')
+                    # Boş satırları temizle
+                    private_key_lines = [line for line in private_key_lines if line.strip()]
+                    # Satırları birleştir
+                    private_key = '\n'.join(private_key_lines)
                     # BEGIN ve END satırlarını düzelt
-                    private_key = private_key.replace('-----BEGIN PRIVATE KEY-----\\n', '-----BEGIN PRIVATE KEY-----\n')
-                    private_key = private_key.replace('\\n-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
-                    # Diğer \n karakterlerini düzelt
-                    private_key = private_key.replace('\\n', '\n')
+                    if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
+                        private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
+                    if not private_key.endswith('-----END PRIVATE KEY-----'):
+                        private_key = private_key + '\n-----END PRIVATE KEY-----'
                     config_data['private_key'] = private_key
 
                 # Düzgün formatlanmış JSON olarak kaydet
@@ -70,6 +74,7 @@ try:
                     json.dump(config_data, f, indent=2)
                 
                 logger.info("Firebase config dosyası başarıyla oluşturuldu")
+                logger.debug(f"Private key formatı: {config_data['private_key']}")
             except json.JSONDecodeError as e:
                 logger.error(f"Firebase config JSON parse hatası: {str(e)}")
                 raise
