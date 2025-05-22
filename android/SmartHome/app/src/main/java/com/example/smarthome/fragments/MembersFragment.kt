@@ -11,9 +11,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.smarthome.R
-import com.example.smarthome.activities.TestRolesActivity
 import com.example.smarthome.adapters.MembersAdapter
 import com.example.smarthome.viewmodels.MembersViewModel
+import com.example.smarthome.auth.AuthManager
+import com.example.smarthome.model.User
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 // TODO: Rename parameter arguments, choose names that match
 // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
@@ -59,8 +64,27 @@ class MembersFragment : Fragment() {
         val rvHost = view.findViewById<RecyclerView>(R.id.rvHost)
         val rvGuests = view.findViewById<RecyclerView>(R.id.rvGuests)
 
-        hostAdapter = MembersAdapter()
-        guestsAdapter = MembersAdapter()
+        // Check if current user is host
+        var isCurrentUserHost = false
+        AuthManager.getCurrentUserRole(
+            onSuccess = { role ->
+                isCurrentUserHost = role == "host"
+                setupAdapters(isCurrentUserHost)
+            },
+            onFailure = { /* Handle error */ }
+        )
+    }
+
+    private fun setupAdapters(isHost: Boolean) {
+        val rvHost = requireView().findViewById<RecyclerView>(R.id.rvHost)
+        val rvGuests = requireView().findViewById<RecyclerView>(R.id.rvGuests)
+
+        hostAdapter = MembersAdapter(isHost) {
+            viewModel.loadMembers()
+        }
+        guestsAdapter = MembersAdapter(isHost) {
+            viewModel.loadMembers()
+        }
 
         rvHost.apply {
             layoutManager = LinearLayoutManager(context)
@@ -72,15 +96,21 @@ class MembersFragment : Fragment() {
             adapter = guestsAdapter
         }
 
-        // Add test roles button
-        val btnTestRoles = view.findViewById<Button>(R.id.btnTestRoles)
-        btnTestRoles.setOnClickListener {
-            startActivity(Intent(requireContext(), TestRolesActivity::class.java))
-        }
-
         // Observe host data
         viewModel.host.observe(viewLifecycleOwner) { host ->
-            hostAdapter.updateMembers(if (host != null) listOf(host) else emptyList())
+            // Get all hosts from the database
+            viewModel.database.child("users").get()
+                .addOnSuccessListener { snapshot ->
+                    val hosts = mutableListOf<User>()
+                    snapshot.children.forEach { child ->
+                        child.getValue(User::class.java)?.let { user ->
+                            if (user.role == "host") {
+                                hosts.add(user)
+                            }
+                        }
+                    }
+                    hostAdapter.updateMembers(hosts)
+                }
         }
 
         // Observe guests data

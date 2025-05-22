@@ -11,8 +11,6 @@ import com.example.smarthome.R
 import android.widget.EditText
 import android.widget.Button
 import android.widget.Toast
-import android.widget.RadioButton
-import android.widget.RadioGroup
 import com.example.smarthome.auth.AuthManager
 
 class SignUpActivity : AppCompatActivity() {
@@ -32,15 +30,12 @@ class SignUpActivity : AppCompatActivity() {
         val etConfirmPassword = findViewById<EditText>(R.id.etConfirmPassword)
         val btnRegister = findViewById<Button>(R.id.btnRegister)
         val tvLogin = findViewById<TextView>(R.id.tvLogin)
-        val rgRole = findViewById<RadioGroup>(R.id.rgRole)
-        val rbHost = findViewById<RadioButton>(R.id.rbHost)
 
         btnRegister.setOnClickListener {
             val username = etFullName.text.toString().trim()
             val email = etEmail.text.toString().trim()
             val password = etPassword.text.toString().trim()
             val confirmPassword = etConfirmPassword.text.toString().trim()
-            val isHost = rbHost.isChecked
 
             if (username.isEmpty() || email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
                 Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show()
@@ -50,16 +45,11 @@ class SignUpActivity : AppCompatActivity() {
                 Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            if (rgRole.checkedRadioButtonId == -1) {
-                Toast.makeText(this, "Please select a role", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
 
             AuthManager.registerUser(
                 email = email,
                 password = password,
                 username = username,
-                isHost = isHost,
                 onSuccess = {
                     Toast.makeText(
                         this,

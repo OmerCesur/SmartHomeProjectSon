@@ -162,8 +162,13 @@ class RoomRepository(val api: SmartHomeApiService) {
 
     fun setTemperature(value: Float) {
         coroutineScope.launch {
-            api.updateSensorData("salon", "temperature", SensorUpdateRequest(value))
-            _salonLiveData.postValue(getSalon()) // güncel sıcaklığı geri al
+            try {
+                // Convert float to string for API compatibility
+                api.updateSensorData("salon", "temperature", SensorUpdateRequest(value.toString()))
+                _salonLiveData.postValue(getSalon()) // Get updated temperature
+            } catch (e: Exception) {
+                Log.e("RoomRepository", "Error setting temperature: ${e.message}")
+            }
         }
     }
 }

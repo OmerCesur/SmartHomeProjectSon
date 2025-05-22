@@ -87,44 +87,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp"/>
 
-    <!-- Role Selection -->
-    <TextView
-        android:id="@+id/tvRoleTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Select Role"
-        android:textColor="@color/colorText"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintTop_toBottomOf="@id/etConfirmPassword"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="16dp"/>
-
-    <RadioGroup
-        android:id="@+id/rgRole"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintTop_toBottomOf="@id/tvRoleTitle"
-        app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="8dp">
-
-        <RadioButton
-            android:id="@+id/rbHost"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Host"
-            android:textColor="@color/colorText"/>
-
-        <RadioButton
-            android:id="@+id/rbGuest"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Guest"
-            android:textColor="@color/colorText"
-            android:checked="true"/>
-    </RadioGroup>
-
     <!-- Register Button -->
     <Button
         android:id="@+id/btnRegister"
@@ -136,7 +98,7 @@
         android:textColor="@android:color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rgRole" />
+        app:layout_constraintTop_toBottomOf="@id/etConfirmPassword" />
 
     <!-- Already have an account -->
     <TextView

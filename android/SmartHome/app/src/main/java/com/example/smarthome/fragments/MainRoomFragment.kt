@@ -15,10 +15,12 @@ import com.example.smarthome.R
 import com.example.smarthome.models.Room
 import com.example.smarthome.viewmodels.MainRoomViewModel
 import android.graphics.Color
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.smarthome.services.TemperatureSensorMonitor
 
 class MainRoomFragment : Fragment() {
 
@@ -33,6 +35,59 @@ class MainRoomFragment : Fragment() {
     private lateinit var btnSetTemp: Button
     private var selectedTemp: Float? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    private lateinit var temperatureSensorMonitor: TemperatureSensorMonitor
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        temperatureSensorMonitor = TemperatureSensorMonitor(requireContext())
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        
+        Log.d(TAG, "onViewCreated: Initializing temperature monitoring")
+        // Start temperature monitoring
+        temperatureSensorMonitor.startMonitoring()
+        
+        // Observe temperature updates
+        viewLifecycleOwner.lifecycleScope.launch {
+            Log.d(TAG, "Starting temperature flow collection")
+            try {
+                temperatureSensorMonitor.temperatureFlow.collect { temperature ->
+                    Log.d(TAG, "Temperature flow emitted value: $temperature")
+                    temperature?.let { temp ->
+                        Log.d(TAG, "Processing temperature update: $temp")
+                        tvCurrentTemp.text = "Current Temperature: ${temp.toInt()}°C"
+                        // Update seekbar if it's not being touched
+                        if (!seekBarTemp.isPressed) {
+                            Log.d(TAG, "Updating seekbar to: ${temp.toInt()}")
+                            seekBarTemp.progress = temp.toInt()
+                            selectedTemp = temp
+                            Log.d(TAG, "UI updated with temperature: $temp")
+                        } else {
+                            Log.d(TAG, "Seekbar is being pressed, skipping update")
+                        }
+                    } ?: Log.d(TAG, "Received null temperature value")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error collecting temperature updates", e)
+            }
+        }
+        
+        // Observe salon data for other updates
+        viewModel.salonLiveData.observe(viewLifecycleOwner) { room ->
+            Log.d(TAG, "Room data updated: $room")
+            handleLightStatus(room.lightIsOn)
+            room.gasSeverity?.let { severity ->
+                updateGasStatus(severity, "0")
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        temperatureSensorMonitor.stopMonitoring()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -120,12 +175,9 @@ class MainRoomFragment : Fragment() {
 
     private fun onRoomData(room: Room) {
         handleLightStatus(room.lightIsOn)
-        room.temperatureCelcius?.let {
-            tvCurrentTemp.text = "Current Temperature: ${it.toInt()}°C"
-            seekBarTemp.progress = it.toInt()
-            selectedTemp = it
-        } ?: run {
-            tvCurrentTemp.text = "Current Temperature: --°C"
+        // Temperature is now handled by the TemperatureSensorMonitor
+        room.gasSeverity?.let { severity ->
+            updateGasStatus(severity, "0")
         }
     }
 

@@ -9,35 +9,48 @@ object AuthManager {
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance().reference
 
-    fun registerUser(email: String, password: String, username: String, isHost: Boolean, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    user?.let { firebaseUser ->
-                        // Create user data in Realtime Database
-                        val userData = User(
-                            uid = firebaseUser.uid,
-                            email = email,
-                            username = username,
-                            role = if (isHost) "host" else "guest"
-                        )
-                        
-                        database.child("users").child(firebaseUser.uid).setValue(userData)
-                            .addOnSuccessListener {
-                                Log.d("AUTH", "User data saved: ${firebaseUser.uid}")
-                                onSuccess()
-                            }
-                            .addOnFailureListener { e ->
-                                Log.e("AUTH", "Failed to save user data: ${e.message}")
-                                onFailure(e.message ?: "Failed to save user data")
-                            }
-                    }
-                } else {
-                    Log.e("AUTH", "Register failed: ${task.exception?.message}")
-                    onFailure(task.exception?.message ?: "Unknown error")
-                }
+    private fun isFirstUser(onResult: (Boolean) -> Unit) {
+        database.child("users").get()
+            .addOnSuccessListener { snapshot ->
+                onResult(!snapshot.exists() || snapshot.childrenCount == 0L)
             }
+            .addOnFailureListener {
+                Log.e("AUTH", "Failed to check first user: ${it.message}")
+                onResult(false)
+            }
+    }
+
+    fun registerUser(email: String, password: String, username: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        isFirstUser { isFirst ->
+            auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val user = auth.currentUser
+                        user?.let { firebaseUser ->
+                            // Create user data in Realtime Database
+                            val userData = User(
+                                uid = firebaseUser.uid,
+                                email = email,
+                                username = username,
+                                role = if (isFirst) "host" else "guest"
+                            )
+                            
+                            database.child("users").child(firebaseUser.uid).setValue(userData)
+                                .addOnSuccessListener {
+                                    Log.d("AUTH", "User data saved: ${firebaseUser.uid}")
+                                    onSuccess()
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("AUTH", "Failed to save user data: ${e.message}")
+                                    onFailure(e.message ?: "Failed to save user data")
+                                }
+                        }
+                    } else {
+                        Log.e("AUTH", "Register failed: ${task.exception?.message}")
+                        onFailure(task.exception?.message ?: "Unknown error")
+                    }
+                }
+        }
     }
 
     fun loginUser(email: String, password: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
@@ -123,6 +136,82 @@ object AuthManager {
             }
             .addOnFailureListener { e ->
                 onFailure(e.message ?: "Failed to update user role")
+            }
+    }
+
+    fun deleteUser(userId: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        // First check if current user is host
+        getCurrentUserRole({ role ->
+            if (role == "host") {
+                // Delete from Realtime Database
+                database.child("users").child(userId).removeValue()
+                    .addOnSuccessListener {
+                        onSuccess()
+                    }
+                    .addOnFailureListener { e ->
+                        onFailure(e.message ?: "Failed to delete user from Database")
+                    }
+            } else {
+                onFailure("Only host can delete users")
+            }
+        }, { error ->
+            onFailure(error)
+        })
+    }
+
+    fun promoteToHost(userId: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        // First check if current user is host
+        getCurrentUserRole({ role ->
+            if (role == "host") {
+                database.child("users").child(userId).child("role")
+                    .setValue("host")
+                    .addOnSuccessListener {
+                        onSuccess()
+                    }
+                    .addOnFailureListener { e ->
+                        onFailure(e.message ?: "Failed to promote user")
+                    }
+            } else {
+                onFailure("Only host can promote users")
+            }
+        }, { error ->
+            onFailure(error)
+        })
+    }
+
+    fun demoteToGuest(userId: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
+        // First check if current user is host
+        getCurrentUserRole({ role ->
+            if (role == "host") {
+                database.child("users").child(userId).child("role")
+                    .setValue("guest")
+                    .addOnSuccessListener {
+                        onSuccess()
+                    }
+                    .addOnFailureListener { e ->
+                        onFailure(e.message ?: "Failed to demote user")
+                    }
+            } else {
+                onFailure("Only host can demote users")
+            }
+        }, { error ->
+            onFailure(error)
+        })
+    }
+
+    fun getUser(userId: String, onSuccess: (User) -> Unit, onFailure: (String) -> Unit) {
+        database.child("users").child(userId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val user = snapshot.getValue(User::class.java)
+                if (user != null) {
+                    onSuccess(user)
+                } else {
+                    onFailure("User not found")
+                }
+            }
+            .addOnFailureListener { e ->
+                onFailure(e.message ?: "Failed to get user data")
             }
     }
 }
