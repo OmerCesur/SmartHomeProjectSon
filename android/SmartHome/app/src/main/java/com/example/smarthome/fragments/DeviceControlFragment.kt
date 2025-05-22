@@ -26,7 +26,7 @@ class DeviceControlFragment : Fragment() {
     private lateinit var switchGarageLight: SwitchCompat
     private lateinit var switchEntranceLight: SwitchCompat
 
-    // Other Controls
+
     private lateinit var switchCurtain: SwitchCompat
     private lateinit var switchGarageDoor: SwitchCompat
     private lateinit var tvCurrentTemp: TextView

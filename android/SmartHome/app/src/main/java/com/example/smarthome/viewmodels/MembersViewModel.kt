@@ -7,7 +7,7 @@ import com.example.smarthome.model.User
 import com.google.firebase.database.FirebaseDatabase
 
 class MembersViewModel : ViewModel() {
-    private val database = FirebaseDatabase.getInstance().reference
+    val database = FirebaseDatabase.getInstance().reference
     private val _host = MutableLiveData<User>()
     private val _guests = MutableLiveData<List<User>>()
 
@@ -24,11 +24,11 @@ class MembersViewModel : ViewModel() {
                     }
                 }
                 
-                // Separate host and guests
-                val hostUser = users.find { it.role == "host" }
+                // Separate hosts and guests
+                val hostUsers = users.filter { it.role == "host" }
                 val guestUsers = users.filter { it.role == "guest" }
                 
-                _host.value = hostUser
+                _host.value = hostUsers.firstOrNull() // Keep first host for backward compatibility
                 _guests.value = guestUsers
             }
     }

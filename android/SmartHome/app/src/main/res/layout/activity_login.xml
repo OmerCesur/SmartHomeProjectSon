@@ -22,27 +22,27 @@
         android:id="@+id/etUsername"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Username"
-        android:text="sevval@sevval.com"
+        android:layout_marginBottom="16dp"
         android:background="@drawable/edittext_background"
-        android:textColor="@color/colorText"
-        android:textColorHint="@color/colorSoftBlue"
+        android:hint="Username"
         android:padding="12dp"
-        android:layout_marginBottom="16dp"/>
+        android:text="testuser@gmail.com"
+        android:textColor="@color/colorText"
+        android:textColorHint="@color/colorSoftBlue" />
 
     <!-- Password -->
     <EditText
-        android:text="Parola123"
         android:id="@+id/etPassword"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/edittext_background"
         android:hint="Password"
         android:inputType="textPassword"
-        android:background="@drawable/edittext_background"
-        android:textColor="@color/colorText"
-        android:textColorHint="@color/colorSoftBlue"
         android:padding="12dp"
-        android:layout_marginBottom="24dp"/>
+        android:text="123456"
+        android:textColor="@color/colorText"
+        android:textColorHint="@color/colorSoftBlue" />
 
     <!-- Login Button -->
     <Button

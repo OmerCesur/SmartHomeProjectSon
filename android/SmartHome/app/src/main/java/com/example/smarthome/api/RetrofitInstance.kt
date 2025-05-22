@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitInstance {
 
-    private const val BASE_URL = "http://192.168.240.242:5001/api/"
+    private const val BASE_URL = "https://smarthomeproject.onrender.com/api/"
 
     private val retrofit by lazy {
         val ohttp = OkHttpClient.Builder()

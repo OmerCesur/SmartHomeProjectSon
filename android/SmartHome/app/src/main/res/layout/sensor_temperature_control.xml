@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout
@@ -13,7 +14,7 @@
             android:id="@+id/tvCurrentTemp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Current Temperature: 22°C"
+            android:text="Current Temperature: --°C"
             android:textColor="@color/colorTextDark"
             android:textSize="16sp"
             android:textStyle="bold"
@@ -29,7 +30,7 @@
             android:id="@+id/tvTargetTemp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Target Temperature: 20°C"
+            android:text="Target Temperature: --°C"
             android:textColor="@color/colorTextDark"
             android:textSize="16sp"
             android:layout_marginTop="8dp" />
