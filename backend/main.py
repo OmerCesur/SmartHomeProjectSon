@@ -60,13 +60,25 @@ try:
                     private_key_lines = config_data['private_key'].split('\\n')
                     # Boş satırları temizle
                     private_key_lines = [line for line in private_key_lines if line.strip()]
+                    
+                    # BEGIN ve END satırlarını kontrol et ve düzelt
+                    begin_line = '-----BEGIN PRIVATE KEY-----'
+                    end_line = '-----END PRIVATE KEY-----'
+                    
+                    # BEGIN satırını ekle
+                    if not any(line.strip() == begin_line for line in private_key_lines):
+                        private_key_lines.insert(0, begin_line)
+                    
+                    # END satırını ekle (sadece bir tane olmalı)
+                    if not any(line.strip() == end_line for line in private_key_lines):
+                        private_key_lines.append(end_line)
+                    else:
+                        # Fazladan END satırlarını temizle
+                        private_key_lines = [line for line in private_key_lines if line.strip() != end_line]
+                        private_key_lines.append(end_line)
+                    
                     # Satırları birleştir
                     private_key = '\n'.join(private_key_lines)
-                    # BEGIN ve END satırlarını düzelt
-                    if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
-                        private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
-                    if not private_key.endswith('-----END PRIVATE KEY-----'):
-                        private_key = private_key + '\n-----END PRIVATE KEY-----'
                     config_data['private_key'] = private_key
 
                 # Düzgün formatlanmış JSON olarak kaydet
