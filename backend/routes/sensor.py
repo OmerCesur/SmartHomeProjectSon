@@ -354,17 +354,24 @@ def update_sensor_data(room, sensor_type):
                         "details": "Integer tipinde değer gerekli"
                     }), 400
                 if sensor_type == "gas":
-                    # Gaz seviyesi için severity hesapla
-                    severity = None
-                    for level, (min_val, max_val) in sensor_config["severity"].items():
-                        if min_val <= value <= max_val:
-                            severity = level
-                            break
-                    if severity is None:
+                    # Gaz yüzdelik float geliyor
+                    if not isinstance(value, (int, float)):
                         return jsonify({
-                            "error": "Geçersiz gaz seviyesi.",
-                            "details": "Gaz seviyesi 0'dan büyük olmalı"
+                            "error": "Geçersiz veri tipi.",
+                            "details": "Float tipinde değer gerekli (0.0-100.0 arası yüzdelik)"
                         }), 400
+                    if not (0.0 <= value <= 100.0):
+                        return jsonify({
+                            "error": "Geçersiz değer.",
+                            "details": "Değer 0.0 ile 100.0 arasında olmalı (yüzdelik)"
+                        }), 400
+                    # Severity hesaplama
+                    if value < 10.0:
+                        severity = "safe"
+                    elif value < 30.0:
+                        severity = "warning"
+                    else:
+                        severity = "danger"
 
             # Sensörün güncellenme zamanı
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
