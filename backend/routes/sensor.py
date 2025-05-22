@@ -3,7 +3,31 @@
 from flask import Blueprint, request, jsonify
 from firebase_admin import db, messaging
 from datetime import datetime
+import logging
+import os
+from logging.handlers import RotatingFileHandler
 # from utils.face_recognition_module import FaceRecognitionModule  # Face ID şimdilik devre dışı
+
+# Logging yapılandırması
+log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+log_file = os.path.join(log_dir, f"sensor_{datetime.now().strftime('%Y%m%d')}.log")
+file_handler = RotatingFileHandler(log_file, maxBytes=10240000, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+console_handler.setLevel(logging.DEBUG)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 # Blueprint tanımlanıyor
 sensor_bp = Blueprint('sensor', __name__)
@@ -203,13 +227,17 @@ def get_sensor_data(room, sensor_type):
         JSON formatında sensör verisi
     """
     try:
+        logger.info(f"Sensör verisi isteği: {room}/{sensor_type}")
+        
         if sensor_type not in SENSOR_TYPES:
+            logger.warning(f"Geçersiz sensör tipi: {sensor_type}")
             return jsonify({
                 "error": "Geçersiz sensör tipi.",
                 "details": f"Desteklenen sensörler: {', '.join(SENSOR_TYPES.keys())}"
             }), 400
 
         if room not in SENSOR_TYPES[sensor_type]["rooms"]:
+            logger.warning(f"Geçersiz oda-sensör kombinasyonu: {room}/{sensor_type}")
             return jsonify({
                 "error": "Geçersiz oda-sensör kombinasyonu.",
                 "details": f"{sensor_type} sensörü {room} odasında bulunmuyor."
@@ -217,9 +245,13 @@ def get_sensor_data(room, sensor_type):
 
         # Firebase'den sensör verisini al
         ref = db.reference(f"sensors/{room}/{sensor_type}")
+        logger.debug(f"Firebase referansı: sensors/{room}/{sensor_type}")
+        
         sensor_data = ref.get()
+        logger.debug(f"Firebase'den alınan veri: {sensor_data}")
 
         if not sensor_data:
+            logger.info(f"Sensör verisi bulunamadı: {room}/{sensor_type}")
             sensor_data = {
                 "value": None,
                 "timestamp": None
@@ -234,6 +266,7 @@ def get_sensor_data(room, sensor_type):
         }), 200
 
     except Exception as e:
+        logger.error(f"Sensör verisi alınırken hata oluştu: {str(e)}", exc_info=True)
         return jsonify({
             "error": "Sensör verisi alınırken hata oluştu.",
             "details": str(e)

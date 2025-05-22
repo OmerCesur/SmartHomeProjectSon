@@ -3,6 +3,10 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from firebase_admin import initialize_app, credentials, db
+import os
+import logging
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
 
 # Import blueprints
 from routes.status import status_bp
@@ -12,18 +16,48 @@ from routes.command import command_bp
 app = Flask(__name__)
 CORS(app)
 
+# Logging yapılandırması
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+log_file = os.path.join(log_dir, f"app_{datetime.now().strftime('%Y%m%d')}.log")
+file_handler = RotatingFileHandler(log_file, maxBytes=10240000, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+console_handler.setLevel(logging.DEBUG)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
 # Register blueprints
 app.register_blueprint(status_bp, url_prefix='/api')
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 
 # Firebase yapılandırması
-import os
-firebase_config_path = os.path.join(os.path.dirname(__file__), "config/firebase_config.json")
-firebase_cred = credentials.Certificate(firebase_config_path)
-firebase_app = initialize_app(firebase_cred, {
-    'databaseURL': 'https://smarthome-aa9f5-default-rtdb.europe-west1.firebasedatabase.app/'
-})
+try:
+    firebase_config_path = os.path.join(os.path.dirname(__file__), "config/firebase_config.json")
+    logger.info(f"Firebase config path: {firebase_config_path}")
+    
+    if not os.path.exists(firebase_config_path):
+        raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
+    
+    firebase_cred = credentials.Certificate(firebase_config_path)
+    firebase_app = initialize_app(firebase_cred, {
+        'databaseURL': 'https://smarthome-aa9f5-default-rtdb.europe-west1.firebasedatabase.app/'
+    })
+    logger.info("Firebase başarıyla başlatıldı")
+except Exception as e:
+    logger.error(f"Firebase başlatılırken hata oluştu: {str(e)}")
+    raise
 
 @app.route('/sensors/bulk-update', methods=['POST'])
 def bulk_update_sensors():
