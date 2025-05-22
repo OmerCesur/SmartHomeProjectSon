@@ -49,9 +49,19 @@ try:
 
     if not os.path.exists(firebase_config_path):
         if firebase_env:
-            # Environment variable'dan dosyaya yaz
-            with open(firebase_config_path, "w") as f:
-                f.write(firebase_env.replace("\\n", "\n"))
+            # Environment variable'dan JSON'ı parse et ve düzgün formatta yaz
+            try:
+                import json
+                config_data = json.loads(firebase_env)
+                # Private key'deki \n karakterlerini gerçek satır sonlarına çevir
+                if 'private_key' in config_data:
+                    config_data['private_key'] = config_data['private_key'].replace('\\n', '\n')
+                # Düzgün formatlanmış JSON olarak kaydet
+                with open(firebase_config_path, "w") as f:
+                    json.dump(config_data, f, indent=2)
+            except json.JSONDecodeError as e:
+                logger.error(f"Firebase config JSON parse hatası: {str(e)}")
+                raise
         else:
             raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
     
