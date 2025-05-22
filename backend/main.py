@@ -49,26 +49,42 @@ try:
 
     if not os.path.exists(firebase_config_path):
         if firebase_env:
-            # Environment variable'dan JSON'ı parse et ve düzgün formatta yaz
             try:
                 import json
+                # Environment variable'dan JSON'ı parse et
                 config_data = json.loads(firebase_env)
-                # Private key'deki \n karakterlerini gerçek satır sonlarına çevir
+                
+                # Private key'i düzgün formatta hazırla
                 if 'private_key' in config_data:
-                    config_data['private_key'] = config_data['private_key'].replace('\\n', '\n')
+                    # Tüm \n karakterlerini gerçek satır sonlarına çevir
+                    private_key = config_data['private_key']
+                    # BEGIN ve END satırlarını düzelt
+                    private_key = private_key.replace('-----BEGIN PRIVATE KEY-----\\n', '-----BEGIN PRIVATE KEY-----\n')
+                    private_key = private_key.replace('\\n-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+                    # Diğer \n karakterlerini düzelt
+                    private_key = private_key.replace('\\n', '\n')
+                    config_data['private_key'] = private_key
+
                 # Düzgün formatlanmış JSON olarak kaydet
                 with open(firebase_config_path, "w") as f:
                     json.dump(config_data, f, indent=2)
+                
+                logger.info("Firebase config dosyası başarıyla oluşturuldu")
             except json.JSONDecodeError as e:
                 logger.error(f"Firebase config JSON parse hatası: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"Firebase config dosyası oluşturulurken hata: {str(e)}")
                 raise
         else:
             raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
     
+    # Config dosyasını oku ve logla
     with open(firebase_config_path, 'r') as f:
         config_content = f.read()
         logger.debug(f"Firebase config içeriği: {config_content}")
     
+    # Firebase credentials'ı yükle
     firebase_cred = credentials.Certificate(firebase_config_path)
     logger.info("Firebase credentials başarıyla yüklendi")
     
