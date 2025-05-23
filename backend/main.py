@@ -2,9 +2,10 @@
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from firebase_admin import db
+from firebase_admin import db, credentials, initialize_app
 import logging
 from datetime import datetime
+import os
 
 # Import blueprints
 from routes.status import status_bp
@@ -12,7 +13,6 @@ from routes.sensor import sensor_bp, init_repositories
 from routes.command import command_bp, init_repository as init_command_repository
 
 # Import configs
-from config.firebase_config import init_firebase
 from config.logging_config import setup_logging
 
 # Flask uygulamasını oluştur
@@ -20,22 +20,36 @@ app = Flask(__name__)
 CORS(app)
 
 # Logging'i yapılandır
-logger = setup_logging('app')
+logger = setup_logging('smart_home')
 
 # Blueprint'leri kaydet
 app.register_blueprint(status_bp, url_prefix='/api')
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 
-# Firebase'i başlat
+# Firebase configuration
+firebase_config = {
+    "type": os.getenv('FIREBASE_TYPE'),
+    "project_id": os.getenv('FIREBASE_PROJECT_ID'),
+    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID'),
+    "private_key": os.getenv('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
+    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL'),
+    "client_id": os.getenv('FIREBASE_CLIENT_ID'),
+    "auth_uri": os.getenv('FIREBASE_AUTH_URI'),
+    "token_uri": os.getenv('FIREBASE_TOKEN_URI'),
+    "auth_provider_x509_cert_url": os.getenv('FIREBASE_AUTH_PROVIDER_X509_CERT_URL'),
+    "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_X509_CERT_URL')
+}
+
 try:
-    firebase_app = init_firebase()
-    logger.info("Firebase başarıyla başlatıldı")
-    
-    # Repository'leri başlat
+    cred = credentials.Certificate(firebase_config)
+    firebase_app = initialize_app(cred, {
+        'databaseURL': f"https://{firebase_config['project_id']}-default-rtdb.firebaseio.com"
+    })
+    db = db.reference()
     init_repositories(db)
     init_command_repository(db)
-    logger.info("Repository'ler başarıyla başlatıldı")
+    logger.info("Firebase başarıyla başlatıldı")
     
     # Test bağlantısı
     try:
