@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from firebase_admin import db
 import logging
 from datetime import datetime
+import json
 
 face_id_bp = Blueprint('face_id', __name__)
 logger = logging.getLogger('smart_home')
@@ -19,13 +20,40 @@ def handle_face_recognition():
     }
     """
     try:
-        data = request.get_json()
+        # Gelen veriyi logla
+        logger.info(f"Gelen istek: {request.get_data()}")
+        
+        # JSON parse etmeyi dene
+        try:
+            data = request.get_json()
+            logger.info(f"Parse edilen JSON: {data}")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse hatası: {str(e)}")
+            return jsonify({
+                "error": "Geçersiz JSON formatı",
+                "details": str(e)
+            }), 400
         
         # Gerekli alanları kontrol et
-        if not data or "device_id" not in data or "recognized" not in data:
+        if not data:
+            logger.error("Boş veri gönderildi")
             return jsonify({
                 "error": "Geçersiz veri formatı",
-                "details": "device_id ve recognized alanları gerekli"
+                "details": "Veri boş olamaz"
+            }), 400
+            
+        if "device_id" not in data:
+            logger.error("device_id eksik")
+            return jsonify({
+                "error": "Geçersiz veri formatı",
+                "details": "device_id alanı gerekli"
+            }), 400
+            
+        if "recognized" not in data:
+            logger.error("recognized eksik")
+            return jsonify({
+                "error": "Geçersiz veri formatı",
+                "details": "recognized alanı gerekli"
             }), 400
             
         device_id = data["device_id"]
@@ -52,13 +80,14 @@ def handle_face_recognition():
             "timestamp": timestamp
         })
         
+        logger.info(f"Face recognition verisi başarıyla kaydedildi: {face_data}")
         return jsonify({
             "message": "Face recognition verisi başarıyla kaydedildi",
             "data": face_data
         }), 200
         
     except Exception as e:
-        logger.error(f"Face recognition verisi işlenirken hata: {str(e)}")
+        logger.error(f"Face recognition verisi işlenirken hata: {str(e)}", exc_info=True)
         return jsonify({
             "error": "Veri işlenirken hata oluştu",
             "details": str(e)
