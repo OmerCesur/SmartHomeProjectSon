@@ -6,40 +6,8 @@ import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.smarthome.R
-import com.google.gson.Gson
-import com.example.smarthome.api.SensorDataResponse
-import com.example.smarthome.api.SensorInfo
-import com.example.smarthome.api.SensorStatus
 
 class NotificationHelper(private val context: Context) {
-
-    fun showTestGasNotification() {
-        // Create a test sensor data response
-        val testSensorData = SensorDataResponse(
-            room = "salon",
-            sensorType = "gas",
-            sensorInfo = SensorInfo(
-                type = "gas",
-                description = "Gas Sensor",
-                status = SensorStatus(
-                    value = "75",
-                    timestamp = System.currentTimeMillis().toString(),
-                    severity = "high"
-                )
-            ),
-            status = SensorStatus(
-                value = "75",
-                timestamp = System.currentTimeMillis().toString(),
-                severity = "high"
-            )
-        )
-
-        showGasSensorNotification(
-            "Gas Sensor Alert",
-            "Gas level: ${testSensorData.status.value} (Severity: ${testSensorData.status.severity})",
-            testSensorData.status.severity ?: "normal"
-        )
-    }
 
     fun showGasSensorNotification(title: String, message: String, severity: String) {
         val channelId = "gas_sensor_channel"

@@ -95,50 +95,6 @@ object AuthManager {
         }
     }
 
-    // Function to update existing users' roles
-    fun updateExistingUsersRoles(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            onFailure("No user is currently logged in")
-            return
-        }
-
-        // Create user data for current user
-        val userData = User(
-            uid = currentUser.uid,
-            email = currentUser.email ?: "",
-            username = currentUser.displayName ?: currentUser.email?.split("@")?.get(0) ?: "User",
-            role = "guest"  // Set default role as guest
-        )
-
-        // Save to database
-        database.child("users").child(currentUser.uid).setValue(userData)
-            .addOnSuccessListener {
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                onFailure(e.message ?: "Failed to update user role")
-            }
-    }
-
-    // Function to set current user as host
-    fun setUserAsHost(onSuccess: () -> Unit, onFailure: (String) -> Unit) {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            onFailure("No user is currently logged in")
-            return
-        }
-
-        database.child("users").child(currentUser.uid).child("role")
-            .setValue("host")
-            .addOnSuccessListener {
-                onSuccess()
-            }
-            .addOnFailureListener { e ->
-                onFailure(e.message ?: "Failed to update user role")
-            }
-    }
-
     fun deleteUser(userId: String, onSuccess: () -> Unit, onFailure: (String) -> Unit) {
         // First check if current user is host
         getCurrentUserRole({ role ->
@@ -197,22 +153,6 @@ object AuthManager {
         }, { error ->
             onFailure(error)
         })
-    }
-
-    fun getUser(userId: String, onSuccess: (User) -> Unit, onFailure: (String) -> Unit) {
-        database.child("users").child(userId)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                val user = snapshot.getValue(User::class.java)
-                if (user != null) {
-                    onSuccess(user)
-                } else {
-                    onFailure("User not found")
-                }
-            }
-            .addOnFailureListener { e ->
-                onFailure(e.message ?: "Failed to get user data")
-            }
     }
 
     fun logout(onSuccess: () -> Unit, onFailure: (String) -> Unit) {

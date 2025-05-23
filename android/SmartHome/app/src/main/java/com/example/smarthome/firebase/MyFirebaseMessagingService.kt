@@ -9,8 +9,6 @@ import com.example.smarthome.R
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
 import com.example.smarthome.api.SensorDataResponse
-import com.example.smarthome.api.SensorInfo
-import com.example.smarthome.api.SensorStatus
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 

@@ -38,7 +38,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        // Instead of finishing the activity, move it to the background
-        moveTaskToBack(true)
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStack()
+        } else {
+            super.onBackPressed()
+        }
     }
 }

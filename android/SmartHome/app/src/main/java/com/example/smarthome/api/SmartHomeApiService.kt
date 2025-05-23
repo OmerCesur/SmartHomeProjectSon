@@ -44,7 +44,7 @@ interface SmartHomeApiService {
      * @param request Request body containing the new sensor value
      * @return Response containing the update result
      */
-    @POST("sensor-data/{room}/{sensorType}")
+    @POST("api/sensor-data/{room}/{sensorType}")
     suspend fun updateSensorData(
         @Path("room") room: String,
         @Path("sensorType") sensorType: String,
@@ -128,6 +128,31 @@ interface SmartHomeApiService {
      */
     @POST("logout")
     suspend fun logout(): BaseResponse
+
+    /**
+     * Send forward2 command
+     * @return Response containing the command result
+     */
+    @POST("forward1")
+    suspend fun sendGarajOpenCommand(): BaseResponse
+
+    @POST("forward2")
+    suspend fun sendPerdeOpenCommand(): BaseResponse
+
+    @POST("forward3")
+    suspend fun sendGirisOpenCommand(): BaseResponse
+
+    @POST("backward1")
+    suspend fun sendGarajCloseCommand(): BaseResponse
+
+    @POST("backward2")
+    suspend fun sendPerdeCloseCommand(): BaseResponse
+
+    @POST("backward3")
+    suspend fun sendGirisCloseCommand(): BaseResponse
+
+    @POST("api/sensor-data/salon/light")
+    suspend fun sendlightCommand(): BaseResponse
 }
 
 // ===== DATA MODELS =====

@@ -3,14 +3,15 @@
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <domain includeSubdomains="true">192.168.240.242</domain>
-        <domain includeSubdomains="true">https://smarthomeproject.onrender.com/</domain>
-
+        <domain includeSubdomains="true">192.168.240.237</domain>
+        <domain includeSubdomains="true">192.168.240.175</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>

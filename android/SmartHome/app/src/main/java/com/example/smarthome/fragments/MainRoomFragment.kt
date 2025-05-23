@@ -21,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.smarthome.services.TemperatureSensorMonitor
+import com.example.smarthome.api.RetrofitInstance
+import com.example.smarthome.api.SensorUpdateRequest
 
 class MainRoomFragment : Fragment() {
 
@@ -118,6 +120,19 @@ class MainRoomFragment : Fragment() {
         switchMainRoomLight.setOnCheckedChangeListener { _, isChecked ->
             if (isUserAction) {
                 viewModel.setLightOn(isChecked)
+                // Send light command
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        RetrofitInstance.smartHomeApiService.updateSensorData(
+                            "salon",
+                            "light",
+                            SensorUpdateRequest(if (isChecked) "on" else "off")
+                        )
+                        Log.d(TAG, "Light command sent successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending light command: ${e.message}")
+                    }
+                }
             }
         }
 

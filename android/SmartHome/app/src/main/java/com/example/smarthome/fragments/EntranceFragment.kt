@@ -13,15 +13,19 @@ import com.example.smarthome.R
 import com.example.smarthome.models.FaceData
 import com.example.smarthome.models.Room
 import com.example.smarthome.viewmodels.EnteranceViewModel
-
+import com.example.smarthome.api.RetrofitInstance
+import com.example.smarthome.api.SensorUpdateRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import android.util.Log
 
 class EntranceFragment : Fragment() {
     private val viewModel : EnteranceViewModel by viewModels()
-
     private lateinit var switchEntranceLight: SwitchCompat
     private lateinit var ivFaceStatusIcon: ImageView
     private lateinit var tvFaceStatusText: TextView
-
+    private val TAG = "EntranceFragment"
 
     // Flag to prevent listener from triggering during programmatic changes
     private var isUserAction = true
@@ -37,7 +41,6 @@ class EntranceFragment : Fragment() {
         ivFaceStatusIcon = view.findViewById(R.id.ivFaceStatusIcon)
         tvFaceStatusText = view.findViewById(R.id.tvFaceStatusText)
 
-
         viewModel.girisLiveData.observe(viewLifecycleOwner) {
             onRoomData(it)
         }
@@ -47,6 +50,19 @@ class EntranceFragment : Fragment() {
             // Only process the event if it's from user interaction
             if (isUserAction) {
                 viewModel.setLightOn(isChecked)
+                // Send light command
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        RetrofitInstance.smartHomeApiService.updateSensorData(
+                            "giris",
+                            "light",
+                            SensorUpdateRequest(if (isChecked) "on" else "off")
+                        )
+                        Log.d(TAG, "Light command sent successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending light command: ${e.message}")
+                    }
+                }
             }
         }
 
