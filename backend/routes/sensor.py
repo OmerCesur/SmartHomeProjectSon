@@ -64,7 +64,7 @@ SENSOR_TYPES = {
         "type": "binary",
         "values": ["on", "off"],
         "description": "Kapı sensörü",
-        "rooms": ["garaj"]
+        "rooms": ["garaj", "giris"]
     },
     "temperature": {
         "type": "float",
@@ -489,5 +489,66 @@ def logout():
     except Exception as e:
         return jsonify({
             "error": "Çıkış yapılırken hata oluştu.",
+            "details": str(e)
+        }), 500
+
+@sensor_bp.route('/command/<room>/<command_type>', methods=['POST'])
+def handle_command(room, command_type):
+    """
+    ESP32'den gelen komutları işler.
+    
+    Args:
+        room (str): Oda adı (garaj, yatak_odasi, antre)
+        command_type (str): Komut tipi (garage, curtain, door)
+        
+    Request Body:
+        {
+            "command": str  # "on" veya "off"
+        }
+        
+    Returns:
+        JSON formatında işlem sonucu
+    """
+    try:
+        logger.info(f"Komut isteği: {room}/{command_type}")
+        
+        data = request.get_json()
+        if not data or 'command' not in data:
+            return jsonify({
+                "error": "Geçersiz istek formatı.",
+                "details": "Request body'de 'command' alanı bulunmalıdır."
+            }), 400
+
+        command = data['command']
+        if command not in ['on', 'off']:
+            return jsonify({
+                "error": "Geçersiz komut.",
+                "details": "Komut 'on' veya 'off' olmalıdır."
+            }), 400
+
+        # Komut tipini sensör tipine dönüştür
+        sensor_type = command_type
+        if command_type == 'garage':
+            sensor_type = 'door'
+        elif command_type == 'curtain':
+            sensor_type = 'curtain'
+        elif command_type == 'door':
+            sensor_type = 'door'
+
+        # Sensör verisini güncelle
+        updated_data = sensor_repository.update_sensor_data(room, sensor_type, command)
+        
+        return jsonify({
+            "message": "Komut başarıyla işlendi.",
+            "room": room,
+            "command_type": command_type,
+            "command": command,
+            "data": updated_data
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Komut işlenirken hata: {str(e)}")
+        return jsonify({
+            "error": "Komut işlenirken hata oluştu.",
             "details": str(e)
         }), 500
