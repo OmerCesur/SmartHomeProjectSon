@@ -11,6 +11,7 @@ import os
 from routes.status import status_bp
 from routes.sensor import sensor_bp, init_repositories
 from routes.command import command_bp, init_repository as init_command_repository
+from routes.face_id import face_id_bp
 
 # Import configs
 from config.logging_config import setup_logging
@@ -26,6 +27,7 @@ logger = setup_logging('smart_home')
 app.register_blueprint(status_bp, url_prefix='/api')
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
+app.register_blueprint(face_id_bp, url_prefix='/api')
 
 # Firebase configuration
 firebase_config = {
