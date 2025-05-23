@@ -70,7 +70,7 @@ def handle_face_recognition():
         # Sensör verisini güncelle
         ref.set(face_data)
         
-        # Bildirim oluştur
+        # Bildirimi veritabanına kaydet
         notification_ref = db.reference("notifications")
         notification_ref.push({
             "title": "Yüz Tanıma",
