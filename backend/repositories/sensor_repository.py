@@ -11,7 +11,7 @@ class SensorRepository:
     def get_sensor_data(self, room, sensor_type):
         """Belirli bir odadaki sensörün verisini getirir."""
         try:
-            ref = self.db.reference(f"sensors/{room}/{sensor_type}")
+            ref = self.db.child(f"sensors/{room}/{sensor_type}")
             return ref.get()
         except Exception as e:
             logger.error(f"Sensör verisi alınırken hata: {str(e)}")
@@ -20,7 +20,7 @@ class SensorRepository:
     def update_sensor_data(self, room, sensor_type, value):
         """Belirli bir odadaki sensörün verisini günceller."""
         try:
-            ref = self.db.reference(f"sensors/{room}/{sensor_type}")
+            ref = self.db.child(f"sensors/{room}/{sensor_type}")
             data = {
                 "value": value,
                 "timestamp": datetime.now().isoformat()
@@ -34,7 +34,7 @@ class SensorRepository:
     def get_all_sensors(self):
         """Tüm sensörlerin verilerini getirir."""
         try:
-            ref = self.db.reference("sensors")
+            ref = self.db.child("sensors")
             return ref.get()
         except Exception as e:
             logger.error(f"Tüm sensör verileri alınırken hata: {str(e)}")
@@ -43,7 +43,7 @@ class SensorRepository:
     def get_room_sensors(self, room):
         """Belirli bir odadaki tüm sensörlerin verilerini getirir."""
         try:
-            ref = self.db.reference(f"sensors/{room}")
+            ref = self.db.child(f"sensors/{room}")
             return ref.get()
         except Exception as e:
             logger.error(f"Oda sensör verileri alınırken hata: {str(e)}")

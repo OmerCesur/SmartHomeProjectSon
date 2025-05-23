@@ -11,7 +11,7 @@ class NotificationRepository:
     def save_notification(self, title, message, notification_type, severity=None, sensor_value=None):
         """Yeni bir bildirim kaydeder."""
         try:
-            ref = self.db.reference("notifications")
+            ref = self.db.child("notifications")
             notification_data = {
                 "title": title,
                 "message": message,
@@ -29,7 +29,7 @@ class NotificationRepository:
     def get_all_notifications(self):
         """Tüm bildirimleri getirir."""
         try:
-            ref = self.db.reference("notifications")
+            ref = self.db.child("notifications")
             return ref.get()
         except Exception as e:
             logger.error(f"Bildirimler alınırken hata: {str(e)}")
@@ -38,7 +38,7 @@ class NotificationRepository:
     def delete_notification(self, notification_id):
         """Belirli bir bildirimi siler."""
         try:
-            ref = self.db.reference(f"notifications/{notification_id}")
+            ref = self.db.child(f"notifications/{notification_id}")
             ref.delete()
             return True
         except Exception as e:
@@ -48,7 +48,7 @@ class NotificationRepository:
     def mark_as_read(self, notification_id):
         """Belirli bir bildirimi okundu olarak işaretler."""
         try:
-            ref = self.db.reference(f"notifications/{notification_id}")
+            ref = self.db.child(f"notifications/{notification_id}")
             ref.update({"read": True})
             return True
         except Exception as e:
