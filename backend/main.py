@@ -46,15 +46,14 @@ try:
     firebase_app = initialize_app(cred, {
         'databaseURL': f"https://{firebase_config['project_id']}-default-rtdb.firebaseio.com"
     })
-    db = db.reference()
-    init_repositories(db)
-    init_command_repository(db)
+    db_ref = db.reference('/')
+    init_repositories(db_ref)
+    init_command_repository(db_ref)
     logger.info("Firebase başarıyla başlatıldı")
     
     # Test bağlantısı
     try:
-        ref = db.reference('/')
-        test_data = ref.get()
+        test_data = db_ref.get()
         logger.info("Firebase bağlantı testi başarılı")
     except Exception as e:
         logger.error(f"Firebase bağlantı testi başarısız: {str(e)}")
