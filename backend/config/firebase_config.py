@@ -3,6 +3,8 @@ import json
 import base64
 import logging
 from firebase_admin import initialize_app, credentials
+cred = credentials.Certificate("path/to/serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
 
 logger = logging.getLogger(__name__)
 
