@@ -44,7 +44,7 @@ firebase_config = {
 try:
     cred = credentials.Certificate(firebase_config)
     firebase_app = initialize_app(cred, {
-        'databaseURL': f"https://{firebase_config['project_id']}-default-rtdb.firebaseio.com"
+        'databaseURL': f"https://{firebase_config['project_id']}-default-rtdb.europe-west1.firebasedatabase.app"
     })
     db_ref = db.reference('/')
     init_repositories(db_ref)
