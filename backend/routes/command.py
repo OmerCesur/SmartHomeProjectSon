@@ -1,11 +1,20 @@
 # routes/command.py: (kullanıcı kontrolü için)
 
 from flask import Blueprint, request, jsonify
-from firebase_admin import db
 from datetime import datetime
+import logging
+from repositories.command_repository import CommandRepository
 
 # Blueprint tanımlanıyor
 command_bp = Blueprint('command', __name__)
+
+# Global repository instance
+command_repository = None
+
+def init_repository(database):
+    """Repository'yi başlat"""
+    global command_repository
+    command_repository = CommandRepository(database)
 
 # Desteklenen komut tipleri
 COMMAND_TYPES = {
@@ -26,6 +35,13 @@ COMMAND_TYPES = {
         "values": ["on", "off"],
         "description": "Kapı kontrolü (aç/kapa)",
         "rooms": ["garaj"]
+    },
+    "temperature": {
+        "type": "numeric",
+        "min": 16,
+        "max": 30,
+        "description": "Sıcaklık ayarı",
+        "rooms": ["yatak_odasi", "salon"]
     }
 }
 
@@ -36,7 +52,7 @@ def get_command_status(room, command_type):
     
     Args:
         room (str): Oda adı
-        command_type (str): Komut tipi (light, curtain, door)
+        command_type (str): Komut tipi (light, curtain, door, temperature)
         
     Returns:
         JSON formatında komut durumu
@@ -54,15 +70,7 @@ def get_command_status(room, command_type):
                 "details": f"{command_type} komutu {room} odasında bulunmuyor."
             }), 400
 
-        # Firebase'den komut durumunu al
-        ref = db.reference(f"commands/{room}/{command_type}")
-        command_status = ref.get()
-
-        if not command_status:
-            command_status = {
-                "value": "off",
-                "timestamp": None
-            }
+        command_status = command_repository.get_command_status(room, command_type)
 
         return jsonify({
             "message": f"{room} odasındaki {command_type} durumu başarıyla alındı.",
@@ -73,6 +81,7 @@ def get_command_status(room, command_type):
         }), 200
 
     except Exception as e:
+        logging.error(f"Komut durumu alınırken hata: {str(e)}")
         return jsonify({
             "error": "Komut durumu alınırken hata oluştu.",
             "details": str(e)
@@ -85,11 +94,11 @@ def send_command(room, command_type):
     
     Args:
         room (str): Oda adı
-        command_type (str): Komut tipi (light, curtain, door)
+        command_type (str): Komut tipi (light, curtain, door, temperature)
         
     Request Body:
         {
-            "command": "on" veya "off"
+            "command": "on"/"off" veya sayısal değer (temperature için)
         }
         
     Returns:
@@ -119,41 +128,85 @@ def send_command(room, command_type):
         command_config = COMMAND_TYPES[command_type]
 
         # Komut validasyonu
-        if command not in command_config["values"]:
-            return jsonify({
-                "error": "Geçersiz komut.",
-                "details": f"{command_type} için geçerli komutlar: {', '.join(command_config['values'])}"
-            }), 400
+        if command_config["type"] == "binary":
+            if command not in command_config["values"]:
+                return jsonify({
+                    "error": "Geçersiz komut.",
+                    "details": f"{command_type} için geçerli komutlar: {', '.join(command_config['values'])}"
+                }), 400
+        elif command_config["type"] == "numeric":
+            try:
+                command = float(command)
+                if not (command_config["min"] <= command <= command_config["max"]):
+                    return jsonify({
+                        "error": "Geçersiz sıcaklık değeri.",
+                        "details": f"Sıcaklık {command_config['min']} ile {command_config['max']} arasında olmalı."
+                    }), 400
+            except ValueError:
+                return jsonify({
+                    "error": "Geçersiz sıcaklık değeri.",
+                    "details": "Sıcaklık sayısal bir değer olmalı."
+                }), 400
 
-        # 🔹 Komutun gönderilme zamanı
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # 🔹 Firebase'e veri yazılacak yol
-        ref_path = f"commands/{room}/{command_type}"
-
-        # 🔹 Komut ve zaman bilgisi birlikte yazılır
-        command_data = {
-            "value": command,
-            "timestamp": timestamp
-        }
-
-        # Komut geçmişini de kaydet
-        history_ref = db.reference(f"command_history/{room}/{command_type}")
-        history_ref.push(command_data)
-
-        # Ana komut verisini güncelle
-        db.reference(ref_path).set(command_data)
+        # Komutu gönder
+        command_data = command_repository.send_command(room, command_type, command)
 
         return jsonify({
             "message": f"{room} odasındaki {command_type} için komut gönderildi.",
             "room": room,
             "command_type": command_type,
             "command": command,
-            "timestamp": timestamp
+            "timestamp": command_data["timestamp"]
         }), 200
 
     except Exception as e:
+        logging.error(f"Komut gönderilirken hata: {str(e)}")
         return jsonify({
             "error": "Komut gönderilirken hata oluştu.",
+            "details": str(e)
+        }), 500
+
+@command_bp.route('/command/<room>/<command_type>/history', methods=['GET'])
+def get_command_history(room, command_type):
+    """
+    Belirli bir odadaki komutun geçmişini döner.
+    
+    Args:
+        room (str): Oda adı
+        command_type (str): Komut tipi
+        
+    Query Parameters:
+        limit (int): Dönecek maksimum kayıt sayısı (varsayılan: 10)
+        
+    Returns:
+        JSON formatında komut geçmişi
+    """
+    try:
+        if command_type not in COMMAND_TYPES:
+            return jsonify({
+                "error": "Geçersiz komut tipi.",
+                "details": f"Desteklenen komutlar: {', '.join(COMMAND_TYPES.keys())}"
+            }), 400
+
+        if room not in COMMAND_TYPES[command_type]["rooms"]:
+            return jsonify({
+                "error": "Geçersiz oda-komut kombinasyonu.",
+                "details": f"{command_type} komutu {room} odasında bulunmuyor."
+            }), 400
+
+        limit = request.args.get('limit', default=10, type=int)
+        history = command_repository.get_command_history(room, command_type, limit)
+
+        return jsonify({
+            "message": f"{room} odasındaki {command_type} komut geçmişi başarıyla alındı.",
+            "room": room,
+            "command_type": command_type,
+            "history": history
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Komut geçmişi alınırken hata: {str(e)}")
+        return jsonify({
+            "error": "Komut geçmişi alınırken hata oluştu.",
             "details": str(e)
         }), 500

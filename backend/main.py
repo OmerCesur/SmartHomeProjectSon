@@ -2,130 +2,40 @@
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from firebase_admin import initialize_app, credentials, db
-import os
+from firebase_admin import db
 import logging
-from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 # Import blueprints
 from routes.status import status_bp
-from routes.sensor import sensor_bp
-from routes.command import command_bp
+from routes.sensor import sensor_bp, init_repositories
+from routes.command import command_bp, init_repository as init_command_repository
 
+# Import configs
+from config.firebase_config import init_firebase
+from config.logging_config import setup_logging
+
+# Flask uygulamasını oluştur
 app = Flask(__name__)
 CORS(app)
 
-# Logging yapılandırması
-log_dir = os.path.join(os.path.dirname(__file__), "logs")
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
+# Logging'i yapılandır
+logger = setup_logging('app')
 
-log_file = os.path.join(log_dir, f"app_{datetime.now().strftime('%Y%m%d')}.log")
-file_handler = RotatingFileHandler(log_file, maxBytes=10240000, backupCount=10)
-file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-))
-file_handler.setLevel(logging.INFO)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-console_handler.setLevel(logging.DEBUG)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-# Register blueprints
+# Blueprint'leri kaydet
 app.register_blueprint(status_bp, url_prefix='/api')
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(command_bp, url_prefix='/api')
 
-# Firebase yapılandırması
+# Firebase'i başlat
 try:
-    firebase_config_path = os.path.join(os.path.dirname(__file__), 'config', 'firebase_config.json')
-    firebase_env = os.environ.get("FIREBASE_CONFIG")
-
-    if not os.path.exists(firebase_config_path):
-        if firebase_env:
-            try:
-                import json
-                import base64
-                # Environment variable'dan JSON'ı parse et
-                config_data = json.loads(firebase_env)
-                
-                # Private key'i düzgün formatta hazırla
-                if 'private_key' in config_data:
-                    # Private key'i satır satır işle
-                    private_key_lines = config_data['private_key'].split('\\n')
-                    # Boş satırları temizle
-                    private_key_lines = [line for line in private_key_lines if line.strip()]
-                    
-                    # BEGIN ve END satırlarını kontrol et ve düzelt
-                    begin_line = '-----BEGIN PRIVATE KEY-----'
-                    end_line = '-----END PRIVATE KEY-----'
-                    
-                    # BEGIN satırını ekle
-                    if not any(line.strip() == begin_line for line in private_key_lines):
-                        private_key_lines.insert(0, begin_line)
-                    
-                    # END satırını ekle (sadece bir tane olmalı)
-                    if not any(line.strip() == end_line for line in private_key_lines):
-                        private_key_lines.append(end_line)
-                    else:
-                        # Fazladan END satırlarını temizle
-                        private_key_lines = [line for line in private_key_lines if line.strip() != end_line]
-                        private_key_lines.append(end_line)
-                    
-                    # Satırları birleştir
-                    private_key = '\n'.join(private_key_lines)
-                    
-                    # Base64 kodlamasını düzelt
-                    try:
-                        # Private key'in içeriğini al (BEGIN ve END satırları hariç)
-                        key_content = '\n'.join(line for line in private_key_lines[1:-1])
-                        # Base64 decode et
-                        decoded_key = base64.b64decode(key_content)
-                        # Tekrar encode et
-                        encoded_key = base64.b64encode(decoded_key).decode('utf-8')
-                        # Satırları 64 karakterlik parçalara böl
-                        wrapped_key = '\n'.join(encoded_key[i:i+64] for i in range(0, len(encoded_key), 64))
-                        # BEGIN ve END satırlarını ekle
-                        private_key = f"{begin_line}\n{wrapped_key}\n{end_line}"
-                    except Exception as e:
-                        logger.warning(f"Base64 düzeltme başarısız oldu, orijinal private key kullanılıyor: {str(e)}")
-                    
-                    config_data['private_key'] = private_key
-
-                # Düzgün formatlanmış JSON olarak kaydet
-                with open(firebase_config_path, "w") as f:
-                    json.dump(config_data, f, indent=2)
-                
-                logger.info("Firebase config dosyası başarıyla oluşturuldu")
-                logger.debug(f"Private key formatı: {config_data['private_key']}")
-            except json.JSONDecodeError as e:
-                logger.error(f"Firebase config JSON parse hatası: {str(e)}")
-                raise
-            except Exception as e:
-                logger.error(f"Firebase config dosyası oluşturulurken hata: {str(e)}")
-                raise
-        else:
-            raise FileNotFoundError(f"Firebase config dosyası bulunamadı: {firebase_config_path}")
-    
-    # Config dosyasını oku ve logla
-    with open(firebase_config_path, 'r') as f:
-        config_content = f.read()
-        logger.debug(f"Firebase config içeriği: {config_content}")
-    
-    # Firebase credentials'ı yükle
-    firebase_cred = credentials.Certificate(firebase_config_path)
-    logger.info("Firebase credentials başarıyla yüklendi")
-    
-    firebase_app = initialize_app(firebase_cred, {
-        'databaseURL': 'https://smarthome-aa9f5-default-rtdb.europe-west1.firebasedatabase.app/'
-    })
+    firebase_app = init_firebase()
     logger.info("Firebase başarıyla başlatıldı")
+    
+    # Repository'leri başlat
+    init_repositories(db)
+    init_command_repository(db)
+    logger.info("Repository'ler başarıyla başlatıldı")
     
     # Test bağlantısı
     try:
@@ -139,69 +49,66 @@ except Exception as e:
     logger.error(f"Firebase başlatılırken hata oluştu: {str(e)}", exc_info=True)
     raise
 
-@app.route('/sensors/bulk-update', methods=['POST'])
+@app.route('/api/sensors/bulk-update', methods=['POST'])
 def bulk_update_sensors():
-    # Log if request is from another PC
-    remote_addr = request.remote_addr
-    if remote_addr not in ('127.0.0.1', 'localhost', '::1'):
-        print(f"Received /sensors/bulk-update POST from remote address: {remote_addr}")
+    """
+    Toplu sensör güncellemesi yapar.
+    
+    Request Body:
+        {
+            "sensors": [
+                {
+                    "room": "yatak_odasi",
+                    "type": "temperature",
+                    "value": 25.5
+                },
+                {
+                    "room": "salon",
+                    "type": "light",
+                    "value": "on"
+                }
+            ]
+        }
+    """
     try:
         data = request.get_json()
-        if not data or 'updates' not in data:
+        if not data or "sensors" not in data:
             return jsonify({
-                "error": "Geçersiz istek formatı.",
-                "details": "Request body'de 'updates' array'i bulunmalıdır."
+                "error": "Geçersiz veri formatı.",
+                "details": "sensors alanı gerekli"
             }), 400
 
-        results = []
-        errors = []
+        sensors = data["sensors"]
+        if not isinstance(sensors, list):
+            return jsonify({
+                "error": "Geçersiz veri formatı.",
+                "details": "sensors bir liste olmalı"
+            }), 400
 
-        for update in data['updates']:
-            room = update.get('room')
-            sensor_type = update.get('sensor_type')
-            value = update.get('value')
+        # Her sensör için güncelleme yap
+        for sensor in sensors:
+            if not all(key in sensor for key in ["room", "type", "value"]):
+                return jsonify({
+                    "error": "Geçersiz sensör verisi.",
+                    "details": "Her sensör room, type ve value alanlarını içermeli"
+                }), 400
 
-            if not all([room, sensor_type, value is not None]):
-                errors.append({
-                    "error": "Eksik parametre",
-                    "details": f"Her güncelleme için room, sensor_type ve value gereklidir.",
-                    "update": update
-                })
-                continue
-
-            try:
-                # Firebase'e yazma
-                ref = db.reference(f"sensors/{room}/{sensor_type}")
-                timestamp = "2024-03-21 12:00:00"  # Gerçek uygulamada datetime.now() kullanılmalı
-                ref.set({
-                    "value": value,
-                    "timestamp": timestamp
-                })
-
-                results.append({
-                    "room": room,
-                    "sensor_type": sensor_type,
-                    "status": "success",
-                    "value": value,
-                    "timestamp": timestamp
-                })
-
-            except Exception as e:
-                errors.append({
-                    "error": "Firebase güncelleme hatası",
-                    "details": str(e),
-                    "update": update
-                })
+            # Sensör verisini güncelle
+            ref = db.reference(f"sensors/{sensor['room']}/{sensor['type']}")
+            ref.set({
+                "value": sensor["value"],
+                "timestamp": datetime.now().isoformat()
+            })
 
         return jsonify({
-            "message": "Toplu güncelleme tamamlandı",
-            "successful_updates": results,
-            "errors": errors
-        }), 200 if not errors else 207
+            "message": "Sensörler başarıyla güncellendi.",
+            "updated_sensors": len(sensors)
+        }), 200
 
     except Exception as e:
+        logger.error(f"Toplu sensör güncellemesi sırasında hata: {str(e)}")
         return jsonify({
-            "error": "Toplu güncelleme sırasında hata oluştu",
+            "error": "Sensörler güncellenirken hata oluştu.",
             "details": str(e)
         }), 500
 

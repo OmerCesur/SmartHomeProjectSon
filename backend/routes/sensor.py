@@ -1,11 +1,13 @@
 # routes/sensor.py: (sensör verileri için)
 
 from flask import Blueprint, request, jsonify
-from firebase_admin import db, messaging
+from firebase_admin import messaging
 from datetime import datetime
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from repositories.sensor_repository import SensorRepository
+from repositories.notification_repository import NotificationRepository
 # from utils.face_recognition_module import FaceRecognitionModule  # Face ID şimdilik devre dışı
 
 # Logging yapılandırması
@@ -31,6 +33,15 @@ logger.addHandler(console_handler)
 
 # Blueprint tanımlanıyor
 sensor_bp = Blueprint('sensor', __name__)
+
+# Repository'leri başlat
+sensor_repository = None
+notification_repository = None
+
+def init_repositories(database):
+    global sensor_repository, notification_repository
+    sensor_repository = SensorRepository(database)
+    notification_repository = NotificationRepository(database)
 
 # Face ID modülünü başlat
 # face_recognition = FaceRecognitionModule()  # Face ID şimdilik devre dışı
@@ -108,22 +119,18 @@ def send_gas_alert_notification(gas_level, severity):
     
     try:
         response = messaging.send(message)
-        print(f"Bildirim başarıyla gönderildi: {response}")
+        logger.info(f"Bildirim başarıyla gönderildi: {response}")
+        
+        # Bildirimi veritabanına kaydet
+        notification_repository.save_notification(
+            title="Gaz Alarmı!",
+            message=f"Gaz seviyesi kritik seviyede: {gas_level}\nLütfen hemen kontrol edin!",
+            notification_type="gas_alert",
+            severity=severity,
+            sensor_value=gas_level
+        )
     except Exception as e:
-        print(f"Bildirim gönderilirken hata oluştu: {str(e)}")
-
-def save_notification_to_db(title, message, severity, gas_level, timestamp):
-    ref = db.reference("notifications")
-    notification_data = {
-        "title": title,
-        "message": message,
-        "type": "gas_alert",
-        "severity": severity,
-        "gas_level": gas_level,
-        "timestamp": timestamp,
-        "read": False
-    }
-    ref.push(notification_data)
+        logger.error(f"Bildirim gönderilirken hata oluştu: {str(e)}")
 
 @sensor_bp.route('/sensors', methods=['GET'])
 def get_all_sensors():
@@ -145,8 +152,7 @@ def get_all_sensors():
         # Her odanın sensörlerinin son durumlarını al
         for room in room_sensors:
             for sensor_name in room_sensors[room]["sensors"]:
-                ref = db.reference(f"sensors/{room}/{sensor_name}")
-                sensor_status = ref.get()
+                sensor_status = sensor_repository.get_sensor_data(room, sensor_name)
                 if sensor_status:
                     room_sensors[room]["sensors"][sensor_name]["status"] = sensor_status
                 else:
@@ -161,6 +167,7 @@ def get_all_sensors():
         }), 200
 
     except Exception as e:
+        logger.error(f"Sensör listesi alınırken hata: {str(e)}")
         return jsonify({
             "error": "Sensör listesi alınırken hata oluştu.",
             "details": str(e)
@@ -192,8 +199,7 @@ def get_room_sensors(room):
 
         # Sensörlerin son durumlarını al
         for sensor_name in room_sensors:
-            ref = db.reference(f"sensors/{room}/{sensor_name}")
-            sensor_status = ref.get()
+            sensor_status = sensor_repository.get_sensor_data(room, sensor_name)
             if sensor_status:
                 room_sensors[sensor_name]["status"] = sensor_status
             else:
@@ -209,6 +215,7 @@ def get_room_sensors(room):
         }), 200
 
     except Exception as e:
+        logger.error(f"Sensör listesi alınırken hata: {str(e)}")
         return jsonify({
             "error": "Sensör listesi alınırken hata oluştu.",
             "details": str(e)
@@ -243,37 +250,23 @@ def get_sensor_data(room, sensor_type):
                 "details": f"{sensor_type} sensörü {room} odasında bulunmuyor."
             }), 400
 
-        # Firebase'den sensör verisini al
-        ref = db.reference(f"sensors/{room}/{sensor_type}")
-        logger.debug(f"Firebase referansı: sensors/{room}/{sensor_type}")
+        sensor_data = sensor_repository.get_sensor_data(room, sensor_type)
         
-        try:
-            sensor_data = ref.get()
-            logger.debug(f"Firebase'den alınan veri: {sensor_data}")
-        except Exception as e:
-            logger.error(f"Firebase'den veri alınırken hata oluştu: {str(e)}", exc_info=True)
+        if sensor_data:
             return jsonify({
-                "error": "Firebase'den veri alınamadı.",
-                "details": str(e)
-            }), 500
-
-        if not sensor_data:
-            logger.info(f"Sensör verisi bulunamadı: {room}/{sensor_type}")
-            sensor_data = {
-                "value": None,
-                "timestamp": None
-            }
-
-        return jsonify({
-            "message": f"{room} odasındaki {sensor_type} verisi başarıyla alındı.",
-            "room": room,
-            "sensor_type": sensor_type,
-            "sensor_info": SENSOR_TYPES[sensor_type],
-            "data": sensor_data
-        }), 200
+                "message": "Sensör verisi başarıyla alındı.",
+                "room": room,
+                "sensor_type": sensor_type,
+                "data": sensor_data
+            }), 200
+        else:
+            return jsonify({
+                "error": "Sensör verisi bulunamadı.",
+                "details": f"{room} odasındaki {sensor_type} sensörü için veri bulunamadı."
+            }), 404
 
     except Exception as e:
-        logger.error(f"Sensör verisi alınırken hata oluştu: {str(e)}", exc_info=True)
+        logger.error(f"Sensör verisi alınırken hata: {str(e)}")
         return jsonify({
             "error": "Sensör verisi alınırken hata oluştu.",
             "details": str(e)
@@ -297,119 +290,83 @@ def update_sensor_data(room, sensor_type):
         JSON formatında işlem sonucu
     """
     try:
+        logger.info(f"Sensör verisi güncelleme isteği: {room}/{sensor_type}")
+        
         if sensor_type not in SENSOR_TYPES:
+            logger.warning(f"Geçersiz sensör tipi: {sensor_type}")
             return jsonify({
                 "error": "Geçersiz sensör tipi.",
                 "details": f"Desteklenen sensörler: {', '.join(SENSOR_TYPES.keys())}"
             }), 400
 
         if room not in SENSOR_TYPES[sensor_type]["rooms"]:
+            logger.warning(f"Geçersiz oda-sensör kombinasyonu: {room}/{sensor_type}")
             return jsonify({
                 "error": "Geçersiz oda-sensör kombinasyonu.",
                 "details": f"{sensor_type} sensörü {room} odasında bulunmuyor."
             }), 400
 
-        # Face ID sensörü için özel işlem
-        if sensor_type == "face_id":
-            face_data = face_recognition.recognize_face()
-            value = "detected" if face_data["detected"] else "not_detected"
-            sensor_data = {
-                "value": value,
-                "timestamp": face_data["timestamp"],
-                "name": face_data["name"]
-            }
-        else:
-            data = request.get_json()
-            if not data or "value" not in data:
+        data = request.get_json()
+        if not data or 'value' not in data:
+            return jsonify({
+                "error": "Geçersiz istek formatı.",
+                "details": "Request body'de 'value' alanı bulunmalıdır."
+            }), 400
+
+        value = data['value']
+        sensor_info = SENSOR_TYPES[sensor_type]
+
+        # Sensör tipine göre değer doğrulama
+        if sensor_info["type"] == "binary":
+            if value not in sensor_info["values"]:
                 return jsonify({
-                    "error": "Sensör verisi eksik.",
-                    "details": "value alanı gerekli"
+                    "error": "Geçersiz değer.",
+                    "details": f"Desteklenen değerler: {', '.join(sensor_info['values'])}"
+                }), 400
+        elif sensor_info["type"] == "float":
+            try:
+                value = float(value)
+                if not (sensor_info["range"][0] <= value <= sensor_info["range"][1]):
+                    return jsonify({
+                        "error": "Değer aralık dışında.",
+                        "details": f"Değer {sensor_info['range'][0]} ile {sensor_info['range'][1]} arasında olmalıdır."
+                    }), 400
+            except ValueError:
+                return jsonify({
+                    "error": "Geçersiz değer formatı.",
+                    "details": "Değer sayısal olmalıdır."
+                }), 400
+        elif sensor_info["type"] == "integer":
+            try:
+                value = int(value)
+                # Gaz sensörü için özel kontrol
+                if sensor_type == "gas":
+                    severity = None
+                    for sev, (min_val, max_val) in sensor_info["severity"].items():
+                        if min_val <= value <= max_val:
+                            severity = sev
+                            break
+                    
+                    if severity == "high":
+                        send_gas_alert_notification(value, severity)
+            except ValueError:
+                return jsonify({
+                    "error": "Geçersiz değer formatı.",
+                    "details": "Değer tam sayı olmalıdır."
                 }), 400
 
-            value = data["value"]
-            sensor_config = SENSOR_TYPES[sensor_type]
-
-            # Sensör tipine göre veri kontrolü
-            if sensor_config["type"] == "binary":
-                if value not in sensor_config["values"]:
-                    return jsonify({
-                        "error": "Geçersiz değer.",
-                        "details": f"Değer {sensor_config['values']} arasından olmalı"
-                    }), 400
-            elif sensor_config["type"] == "float":
-                if not isinstance(value, (int, float)):
-                    return jsonify({
-                        "error": "Geçersiz veri tipi.",
-                        "details": "Float tipinde değer gerekli"
-                    }), 400
-                if not (sensor_config["range"][0] <= value <= sensor_config["range"][1]):
-                    return jsonify({
-                        "error": "Geçersiz değer.",
-                        "details": f"Değer {sensor_config['range'][0]} ile {sensor_config['range'][1]} arasında olmalı"
-                    }), 400
-            elif sensor_config["type"] == "integer":
-                if not isinstance(value, int):
-                    return jsonify({
-                        "error": "Geçersiz veri tipi.",
-                        "details": "Integer tipinde değer gerekli"
-                    }), 400
-                if sensor_type == "gas":
-                    # Gaz yüzdelik float geliyor
-                    if not isinstance(value, (int, float)):
-                        return jsonify({
-                            "error": "Geçersiz veri tipi.",
-                            "details": "Float tipinde değer gerekli (0.0-100.0 arası yüzdelik)"
-                        }), 400
-                    if not (0.0 <= value <= 100.0):
-                        return jsonify({
-                            "error": "Geçersiz değer.",
-                            "details": "Değer 0.0 ile 100.0 arasında olmalı (yüzdelik)"
-                        }), 400
-                    # Severity hesaplama
-                    if value < 10.0:
-                        severity = "safe"
-                    elif value < 30.0:
-                        severity = "warning"
-                    else:
-                        severity = "danger"
-
-            # Sensörün güncellenme zamanı
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # Firebase'e yazılacak veri
-            sensor_data = {
-                "value": value,
-                "timestamp": timestamp
-            }
-
-            # Gaz sensörü için severity ekle
-            if sensor_type == "gas":
-                sensor_data["severity"] = severity
-                # Kritik seviyede ise bildirim gönder
-                send_gas_alert_notification(value, severity)
-                save_notification_to_db(
-                    title="Gaz Alarmı!",
-                    message=f"Gaz seviyesi kritik seviyede: {value}\nLütfen hemen kontrol edin!",
-                    severity=severity,
-                    gas_level=value,
-                    timestamp=timestamp
-                )
-
-        # Sensör geçmişini kaydet
-        history_ref = db.reference(f"sensor_history/{room}/{sensor_type}")
-        history_ref.push(sensor_data)
-
-        # Ana sensör verisini güncelle
-        db.reference(f"sensors/{room}/{sensor_type}").set(sensor_data)
-
+        # Sensör verisini güncelle
+        updated_data = sensor_repository.update_sensor_data(room, sensor_type, value)
+        
         return jsonify({
-            "message": f"{room} odasındaki {sensor_type} verisi güncellendi.",
+            "message": "Sensör verisi başarıyla güncellendi.",
             "room": room,
             "sensor_type": sensor_type,
-            "data": sensor_data
+            "data": updated_data
         }), 200
 
     except Exception as e:
+        logger.error(f"Sensör verisi güncellenirken hata: {str(e)}")
         return jsonify({
             "error": "Sensör verisi güncellenirken hata oluştu.",
             "details": str(e)
@@ -424,30 +381,13 @@ def get_notifications():
         JSON formatında bildirim listesi
     """
     try:
-        # Firebase'den bildirimleri al
-        ref = db.reference("notifications")
-        notifications = ref.get()
-
-        if not notifications:
-            return jsonify({
-                "message": "Henüz bildirim yok.",
-                "notifications": []
-            }), 200
-
-        # Bildirimleri tarihe göre sırala (en yeni en üstte)
-        notifications_list = []
-        for notification_id, notification in notifications.items():
-            notification["id"] = notification_id
-            notifications_list.append(notification)
-
-        notifications_list.sort(key=lambda x: x["timestamp"], reverse=True)
-
+        notifications = notification_repository.get_all_notifications()
         return jsonify({
             "message": "Bildirimler başarıyla alındı.",
-            "notifications": notifications_list
+            "notifications": notifications
         }), 200
-
     except Exception as e:
+        logger.error(f"Bildirimler alınırken hata: {str(e)}")
         return jsonify({
             "error": "Bildirimler alınırken hata oluştu.",
             "details": str(e)
@@ -465,16 +405,12 @@ def delete_notification(notification_id):
         JSON formatında işlem sonucu
     """
     try:
-        # Firebase'den bildirimi sil
-        ref = db.reference(f"notifications/{notification_id}")
-        ref.delete()
-
+        notification_repository.delete_notification(notification_id)
         return jsonify({
-            "message": "Bildirim başarıyla silindi.",
-            "notification_id": notification_id
+            "message": "Bildirim başarıyla silindi."
         }), 200
-
     except Exception as e:
+        logger.error(f"Bildirim silinirken hata: {str(e)}")
         return jsonify({
             "error": "Bildirim silinirken hata oluştu.",
             "details": str(e)
