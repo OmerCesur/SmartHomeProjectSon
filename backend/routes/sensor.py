@@ -8,7 +8,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from repositories.sensor_repository import SensorRepository
 from repositories.notification_repository import NotificationRepository
-# from utils.face_recognition_module import FaceRecognitionModule  # Face ID şimdilik devre dışı
+from utils.face_recognition_module import FaceRecognitionModule  # Face ID modülü aktif
 
 # Logging yapılandırması
 log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
@@ -44,7 +44,7 @@ def init_repositories(database):
     notification_repository = NotificationRepository(database)
 
 # Face ID modülünü başlat
-# face_recognition = FaceRecognitionModule()  # Face ID şimdilik devre dışı
+face_recognition = FaceRecognitionModule()  # Face ID modülü aktif
 
 # Desteklenen sensör tipleri
 SENSOR_TYPES = {
